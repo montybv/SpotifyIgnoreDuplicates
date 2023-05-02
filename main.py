@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 import threading
 import webbrowser
 import os
@@ -6,21 +6,23 @@ from spotify_api_requests import *
 import signal
 from constants import *
 
+
 app = Flask(__name__)
 server_thread = None
-request_stop = False
+request_stop = threading.Event()
 
 
 def save_playlist():
-    print('Saving playlist')
+    print('Saving playlist...')
     with open(SAVED_PLAYLIST, 'w') as f:
         for track in PLAYED_TRACKS:
             f.write(f'{track},{PLAYED_TRACKS[track]}\n')
+    print('Playlist saved')
 
 
 def open_playlist():
     if os.path.exists(SAVED_PLAYLIST):
-        print('Reading playlist')
+        print('Reading playlist...')
         with open(SAVED_PLAYLIST, 'r') as f:
             for line in f.readlines():
                 values = line.rstrip('\n').split(',')
@@ -34,11 +36,11 @@ def sigint_handler(signal, frame):
     global request_stop
     print('Requested to shutdown')
     save_playlist()
-    request_stop = True
+    request_stop.set()
     # Here you can add any code you want to execute when SIGINT is received
     # For example, you can clean up resources or exit the program gracefully
     try:
-        requests.post('http://localhost:5000/shutdown', timeout=2)
+        requests.get('http://localhost:5000/stopServer')
     except:
         pass
 
@@ -51,9 +53,10 @@ def callback():
     return 'Access token obtained'
 
 
-@app.post('/shutdown')
+@app.route('/stopServer', methods=['GET'])
 def shutdown():
-    exit(1)
+    os.kill(os.getpid(), signal.SIGINT)
+    return jsonify({"success": True, "message": "Server is shutting down..."})
 
 
 if __name__ == '__main__':
@@ -65,7 +68,8 @@ if __name__ == '__main__':
         CONDITION.wait()
     signal.signal(signal.SIGINT, sigint_handler)
     open_playlist()
-    while not request_stop:
+    while not request_stop.is_set():
         get_current_playing_track()
         time.sleep(0.1)
     server_thread.join()
+    print('thread ends')
