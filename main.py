@@ -8,6 +8,7 @@ from constants import *
 
 app = Flask(__name__)
 server_thread = None
+request_stop = False
 
 
 def save_playlist():
@@ -30,8 +31,10 @@ def open_playlist():
 
 
 def sigint_handler(signal, frame):
+    global request_stop
     print('Requested to shutdown')
     save_playlist()
+    request_stop = True
     # Here you can add any code you want to execute when SIGINT is received
     # For example, you can clean up resources or exit the program gracefully
     try:
@@ -45,18 +48,12 @@ def callback():
     get_authorisation_code()
     with CONDITION:
         CONDITION.notify_all()
-    # get_user_profile()
-    # submit_track_change_notification()
     return 'Access token obtained'
-
-
-def shutdown_server():
-    exit(1)
 
 
 @app.post('/shutdown')
 def shutdown():
-    shutdown_server()
+    exit(1)
 
 
 if __name__ == '__main__':
@@ -68,7 +65,7 @@ if __name__ == '__main__':
         CONDITION.wait()
     signal.signal(signal.SIGINT, sigint_handler)
     open_playlist()
-    while True:
+    while not request_stop:
         get_current_playing_track()
         time.sleep(0.1)
     server_thread.join()
