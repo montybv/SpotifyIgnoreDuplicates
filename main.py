@@ -5,6 +5,7 @@ import os
 from spotify_api_requests import *
 import signal
 from constants import *
+from refresh_token_timer import TimerThread
 
 
 app = Flask(__name__)
@@ -30,6 +31,12 @@ def open_playlist():
                     PLAYED_TRACKS[values[0]] = values[1]
     else:
         print('No playlist to open')
+
+
+def do_refresh_token():
+    print('Refresh token')
+    auth_url = f'https://accounts.spotify.com/authorize?response_type=code&client_id={SPOTIFY_CLIENT_ID}&scope={SCOPES}&redirect_uri={SPOTIFY_REDIRECT_URI}&state={STATE}'
+    webbrowser.open(auth_url)
 
 
 def sigint_handler(signal, frame):
@@ -62,14 +69,17 @@ def shutdown():
 if __name__ == '__main__':
     server_thread = threading.Thread(target=app.run)
     server_thread.start()
-    auth_url = f'https://accounts.spotify.com/authorize?response_type=code&client_id={SPOTIFY_CLIENT_ID}&scope={SCOPES}&redirect_uri={SPOTIFY_REDIRECT_URI}&state={STATE}'
-    webbrowser.open(auth_url)
+    refresh_token_timer = TimerThread(interval=REFRESH_TOKEN_TIMER_S, command=do_refresh_token)
+    do_refresh_token()
     with CONDITION:
         CONDITION.wait()
+    refresh_token_timer.start()
     signal.signal(signal.SIGINT, sigint_handler)
     open_playlist()
     while not request_stop.is_set():
         get_current_playing_track()
-        time.sleep(0.1)
+        time.sleep(0.5)
+    refresh_token_timer.stop()
+    refresh_token_timer.join()
     server_thread.join()
     print('thread ends')

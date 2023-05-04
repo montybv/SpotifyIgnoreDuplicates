@@ -5,3 +5,4 @@ SCOPES = 'user-read-playback-state user-read-currently-playing user-modify-playb
 
 SAVED_PLAYLIST = 'saved_played_tracks.txt'
 NEXT_TRACK_AFTER_X_MS = 10000
+REFRESH_TOKEN_TIMER_S = 3500
